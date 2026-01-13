@@ -1,0 +1,65 @@
+name: CI Build
+
+# Trigger workflow on push or pull request to main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    # Runner for the job
+    runs-on: ubuntu-latest
+
+    # Run inside Python 3.9 Docker container
+    container: python:3.9-slim
+
+    # Define services (example: PostgreSQL)
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 3: Wait for PostgreSQL service
+      - name: Wait for database
+        run: |
+          until pg_isready -h localhost -U testuser -d testdb; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      # Step 4: Run tests
+      - name: Run tests
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
+        run: pytest
+
+      # Step 5: Optional: Lint code
+      - name: Lint code
+        run: |
+          pip install flake8
+          flake8 .
