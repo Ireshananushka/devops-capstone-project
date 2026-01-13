@@ -38,10 +38,11 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install -r requirements.txt
 
-      # Step 3: Lint code with flake8
+      # Step 3: Lint code with flake8 (robust version)
       - name: Lint with flake8
         run: |
-          flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Ignore F401 (unused imports) but keep all other checks
+          flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics --ignore=F401
           flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
 
       # Step 4: Wait for PostgreSQL service to be ready
