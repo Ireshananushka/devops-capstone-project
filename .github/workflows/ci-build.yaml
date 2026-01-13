@@ -1,6 +1,5 @@
 name: CI Build
 
-# Trigger workflow on push or pull request to main
 on:
   push:
     branches:
@@ -11,55 +10,50 @@ on:
 
 jobs:
   build:
-    # Runner for the job
     runs-on: ubuntu-latest
-
-    # Run inside Python 3.9 Docker container
     container: python:3.9-slim
 
-    # Define services (example: PostgreSQL)
     services:
       postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+        image: postgres:alpine
         ports:
           - 5432:5432
+        env:
+          POSTGRES_PASSWORD: pgs3cr3t
+          POSTGRES_DB: testdb
         options: >-
-          --health-cmd "pg_isready -U testuser -d testdb"
+          --health-cmd "pg_isready -U postgres -d testdb"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     steps:
       # Step 1: Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v2
 
       # Step 2: Install dependencies
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip wheel
           pip install -r requirements.txt
 
-      # Step 3: Wait for PostgreSQL service
-      - name: Wait for database
+      # Step 3: Lint code with flake8
+      - name: Lint with flake8
         run: |
-          until pg_isready -h localhost -U testuser -d testdb; do
-            echo "Waiting for PostgreSQL..."
+          flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
+
+      # Step 4: Wait for PostgreSQL service to be ready
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres -d testdb; do
+            echo "Waiting for PostgreSQL to be ready..."
             sleep 2
           done
 
-      # Step 4: Run tests
-      - name: Run tests
+      # Step 5: Run unit tests with Nose
+      - name: Run unit tests with nose
+        run: nosetests -v --with-spec --spec-color --with-coverage --cover-package=service
         env:
-          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
-        run: pytest
-
-      # Step 5: Optional: Lint code
-      - name: Lint code
-        run: |
-          pip install flake8
-          flake8 .
+          DATABASE_URI: "postgresql://postgres:pgs3cr3t@postgres:5432/testdb"
