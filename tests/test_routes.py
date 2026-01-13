@@ -37,23 +37,22 @@ class TestAccountService(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """Runs once before test suite"""
+        """Runs once after test suite"""
+        pass
 
     def setUp(self):
         """Runs before each test"""
         db.session.query(Account).delete()  # clean up the last tests
         db.session.commit()
-
         self.client = app.test_client()
 
     def tearDown(self):
         """Runs once after each test case"""
         db.session.remove()
 
-    ######################################################################
+    ##################################################################
     #  H E L P E R   M E T H O D S
-    ######################################################################
-
+    ##################################################################
     def _create_accounts(self, count):
         """Factory method to create accounts in bulk"""
         accounts = []
@@ -70,9 +69,21 @@ class TestAccountService(TestCase):
             accounts.append(account)
         return accounts
 
-    ######################################################################
+    ##################################################################
     #  A C C O U N T   T E S T   C A S E S
-    ######################################################################
+    ##################################################################
+    def test_get_account(self):
+        """It should Read a single Account"""
+        account = self._create_accounts(1)[0]
+        resp = self.client.get(f"{BASE_URL}/{account.id}", content_type="application/json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.get_json()
+        self.assertEqual(data["name"], account.name)
+
+    def test_account_not_found(self):
+        """It should not Read an Account that is not found"""
+        response = self.client.get("/accounts/0")
+        self.assertEqual(response.status_code, 404)
 
     def test_index(self):
         """It should get 200_OK from the Home Page"""
@@ -122,5 +133,3 @@ class TestAccountService(TestCase):
             content_type="test/html"
         )
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
-
-    # ADD YOUR TEST CASES HERE ...
