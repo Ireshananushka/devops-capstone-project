@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts
+  labels:
+    app: accounts
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: accounts
+  template:
+    metadata:
+      labels:
+        app: accounts
+    spec:
+      containers:
+        - name: accounts
+          image: IMAGE_NAME_HERE
+          ports:
+            - containerPort: 8080
+          env:
+            # Database hostname
+            - name: DATABASE_HOST
+              value: "postgresql"
+            # Database credentials from secret
+            - name: DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret      # Replace with your secret name
+                  key: database-name         # Replace with your secret key
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret      # Replace with your secret name
+                  key: database-user         # Replace with your secret key
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret      # Replace with your secret name
+                  key: database-password     # Replace with your secret key
+            # Optional DATABASE_URI for compatibility
+            - name: DATABASE_URI
+              value: "postgresql://postgres:postgres@postgresql:5432/postgres"
+      restartPolicy: Always
