@@ -13,8 +13,12 @@ spec:
     - name: pipeline-workspace
   params:
     - name: repo-url
+      type: string
     - name: branch
-      default: main
+      type: string
+    - name: build-image
+      type: string
+
   tasks:
     - name: init
       workspaces:
@@ -50,7 +54,7 @@ spec:
           value: ["--count", "--max-complexity=10", "--max-line-length=127", "--statistics"]
       runAfter:
         - clone
-        
+    
     - name: tests
       workspaces:
         - name: source
@@ -61,6 +65,23 @@ spec:
         - name: database_uri
           value: sqlite:///test.db
         - name: args
-          value: "-v --with-spec --spec-color"
+          value:
+            - -v
+            - --with-spec
+            - --spec-color
       runAfter:
         - clone
+    
+    - name: build
+      workspaces:
+        - name: source
+          workspace: pipeline-workspace
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      params:
+      - name: IMAGE
+        value: "$(params.build-image)"
+      runAfter:
+        - tests
+        - lint
