@@ -21,8 +21,7 @@ spec:
       - image: us.icr.io/sn-labs-ireshan685/accounts:1
         name: accounts
         resources: {}
-         HEAD
-        2d4d4a7 (Added Kubernetes support)
+
         env:
           - name: DATABASE_HOST
             value: postgresql
@@ -40,8 +39,5 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: postgresql
-                key: database-user
-      HEAD
-status:{}
-status: {}
- 2d4d4a7 (Added Kubernetes support)
+                key: database-user        
+                status: {}
