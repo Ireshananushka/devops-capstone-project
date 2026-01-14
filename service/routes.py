@@ -1,113 +1,97 @@
-"""
-Account Service
+from flask import Flask, jsonify, request, url_for  # noqa: F401
+from service.models import db, Account
+from service.common import status
 
-This microservice handles the lifecycle of Accounts
-"""
-# pylint: disable=unused-import
-from flask import jsonify, request, make_response, abort, url_for # noqa: F401
-from service.models import Account
-from service.common import status  # HTTP Status Codes
-from . import app  # Import Flask application
+app = Flask(__name__)
 
-
-############################################################
-# Health Endpoint
-############################################################
-@app.route("/health")
-def health():
-    """Health Status"""
-    return jsonify(dict(status="OK")), status.HTTP_200_OK
-
-
-######################################################################
-# GET INDEX
-######################################################################
-@app.route("/")
-def index():
-    """Root URL response"""
-    return jsonify(
-        name="Account REST API Service",
-        version="1.0",
-    ), status.HTTP_200_OK
-
-
-######################################################################
-# CREATE A NEW ACCOUNT
-######################################################################
-@app.route("/accounts", methods=["POST"])
-def create_accounts():
-    """Creates an Account"""
-    app.logger.info("Request to create an Account")
-    check_content_type("application/json")
-    account = Account()
-    account.deserialize(request.get_json())
-    account.create()
-    message = account.serialize()
-    location_url = f"/accounts/{account.id}"
-    return make_response(jsonify(message), status.HTTP_201_CREATED, {"Location": location_url})
-
-
-######################################################################
-# LIST ALL ACCOUNTS
-######################################################################
+# -------------------------------
+# GET all accounts
+# -------------------------------
 @app.route("/accounts", methods=["GET"])
-def list_accounts():
-    """List all Accounts"""
-    app.logger.info("Request to list Accounts")
-    accounts = Account.all()
-    account_list = [account.serialize() for account in accounts]
-    app.logger.info("Returning [%s] accounts", len(account_list))
-    return jsonify(account_list), status.HTTP_200_OK
+def get_accounts():
+    accounts = Account.query.all()
+    results = [account.serialize() for account in accounts]
+    return jsonify(results), status.HTTP_200_OK
 
-
-######################################################################
-# READ AN ACCOUNT
-######################################################################
+# -------------------------------
+# GET account by ID
+# -------------------------------
 @app.route("/accounts/<int:account_id>", methods=["GET"])
 def get_account(account_id):
-    """Reads an Account"""
-    app.logger.info("Request to read an Account with id: %s", account_id)
-    account = Account.find(account_id)
+    account = Account.query.get(account_id)
     if not account:
-        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] could not be found.")
+        return jsonify({"error": "Account not found"}), status.HTTP_404_NOT_FOUND
     return jsonify(account.serialize()), status.HTTP_200_OK
 
+# -------------------------------
+# CREATE a new account
+# -------------------------------
+@app.route("/accounts", methods=["POST"])
+def create_account():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), status.HTTP_400_BAD_REQUEST
 
-######################################################################
-# UPDATE AN EXISTING ACCOUNT
-######################################################################
+    account = Account(
+        name=data.get("name"),
+        email=data.get("email"),
+        address=data.get("address"),
+        phone_number=data.get("phone_number")
+    )
+    db.session.add(account)
+    db.session.commit()
+    return jsonify(account.serialize()), status.HTTP_201_CREATED
+
+# -------------------------------
+# UPDATE an existing account
+# -------------------------------
 @app.route("/accounts/<int:account_id>", methods=["PUT"])
-def update_accounts(account_id):
-    """Update an Account"""
-    app.logger.info("Request to update an Account with id: %s", account_id)
-    account = Account.find(account_id)
+def update_account(account_id):
+    account = Account.query.get(account_id)
     if not account:
-        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] could not be found.")
-    account.deserialize(request.get_json())
-    account.update()
-    return account.serialize(), status.HTTP_200_OK
+        return jsonify({"error": "Account not found"}), status.HTTP_404_NOT_FOUND
 
+    data = request.get_json()
+    account.name = data.get("name", account.name)
+    account.email = data.get("email", account.email)
+    account.address = data.get("address", account.address)
+    account.phone_number = data.get("phone_number", account.phone_number)
 
-######################################################################
-# DELETE AN ACCOUNT
-######################################################################
+    db.session.commit()
+    return jsonify(account.serialize()), status.HTTP_200_OK
+
+# -------------------------------
+# DELETE an account
+# -------------------------------
 @app.route("/accounts/<int:account_id>", methods=["DELETE"])
-def delete_accounts(account_id):
-    """Delete an Account"""
-    app.logger.info("Request to delete an Account with id: %s", account_id)
-    account = Account.find(account_id)
-    if account:
-        account.delete()
+def delete_account(account_id):
+    account = Account.query.get(account_id)
+    if not account:
+        return jsonify({"error": "Account not found"}), status.HTTP_404_NOT_FOUND
+
+    db.session.delete(account)
+    db.session.commit()
     return "", status.HTTP_204_NO_CONTENT
 
+# -------------------------------
+# Health check route
+# -------------------------------
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "ok"}), status.HTTP_200_OK
 
-######################################################################
-#  U T I L I T Y   F U N C T I O N S
-######################################################################
-def check_content_type(media_type):
-    """Checks that the media type is correct"""
-    content_type = request.headers.get("Content-Type")
-    if content_type and content_type == media_type:
-        return
-    app.logger.error("Invalid Content-Type: %s", content_type)
-    abort(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"Content-Type must be {media_type}")
+# -------------------------------
+# Additional routes from main branch
+# -------------------------------
+# Example: search endpoint
+# @app.route("/accounts/search", methods=["GET"])
+# def search_accounts():
+#     query = request.args.get("q")
+#     results = Account.query.filter(Account.name.ilike(f"%{query}%")).all()
+#     return jsonify([a.serialize() for a in results]), status.HTTP_200_OK
+
+# -------------------------------
+# App initialization
+# -------------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
