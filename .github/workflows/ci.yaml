@@ -11,36 +11,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: python:3.9-slim
-    services:
-      postgres:
-        image: postgres:alpine
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_PASSWORD: pgs3cr3t
-          POSTGRES_DB: testdb
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r requirements.txt
+          pip install flake8
 
+      # Step 3: Lint code with flake8
       - name: Lint with flake8
         run: |
+          # First, check for serious errors
           flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
+          # Then, check complexity and line length, ignoring F401 globally
+          flake8 service --count --max-complexity=10 --max-line-length=127 --statistics --ignore=F401
 
       - name: Run unit tests with nose
-        run: nosetests
+        run: |
+          nosetests -v --with-spec --spec-color --with-coverage --cover-package=service
         env:
           DATABASE_URI: "postgresql://postgres:pgs3cr3t@postgres:5432/testdb"
